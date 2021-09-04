@@ -96,15 +96,16 @@ services:
       KONG_ADMIN_ACCESS_LOG: /dev/stdout
       KONG_ADMIN_ERROR_LOG: /dev/stderr
       KONG_ADMIN_LISTEN: '0.0.0.0:8001'
-      KONG_PROXY_LISTEN: '0.0.0.0:8000'
       KONG_CASSANDRA_CONTACT_POINTS: pgsql
       KONG_DATABASE: *dbType
       KONG_PG_DATABASE: *kongDB
       KONG_PG_HOST: *pgHost
+      KONG_PG_PASSWORD: *pgPass
       KONG_PG_USER: *pgUser
+      KONG_PLUGINS: oidc
       KONG_PROXY_ACCESS_LOG: /dev/stdout
       KONG_PROXY_ERROR_LOG: /dev/stderr
-      KONG_PG_PASSWORD: *pgPass
+      KONG_PROXY_LISTEN: '0.0.0.0:8000'
     ports:
       - 8000:8000
       - 8001
@@ -173,7 +174,7 @@ services:
     depends_on:
       kong:
         condition: service_healthy
-    entrypoint: /bin/sh -c "apk add jq && /kong-config-init.sh"
+    entrypoint: /bin/sh -c "apk add --no-cache jq && /kong-config-init.sh"
     restart: on-failure
 
   httpbin:

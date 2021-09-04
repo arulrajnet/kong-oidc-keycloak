@@ -8,7 +8,7 @@
       "clientAuthenticatorType": "client-secret",
       "secret": "cf657905-6daa-4e65-806f-86dd7c968b78",
       "redirectUris": [
-        "https://localhost:8000/*"
+        "http://localhost:8000/*"
       ],
       "protocol": "openid-connect",
       "publicClient": false

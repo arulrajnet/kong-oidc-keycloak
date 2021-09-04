@@ -1,17 +1,34 @@
 #! /usr/bin/env sh
+set -e
+# set -x
 
 export KONG_SERVICE_HOST=${KONG_SERVICE_HOST:-kong}
 export KONG_SERVICE_ADMIN_PORT=${KONG_SERVICE_ADMIN_PORT:-8001}
+export OIDC_CLIENT_ID=${OIDC_CLIENT_ID:-web-client}
+export OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET:-cf657905-6daa-4e65-806f-86dd7c968b78}
 
 # Delete
 
+## plugins
+plugins=$(curl -s -X GET http://${KONG_SERVICE_HOST}:${KONG_SERVICE_ADMIN_PORT}/plugins | jq -r '.data[]|.id')
+
+for plugin in $plugins; do
+  curl -s -X DELETE http://${KONG_SERVICE_HOST}:${KONG_SERVICE_ADMIN_PORT}/plugins/$plugin
+done
+
 ## routes
-curl -s -X DELETE http://${KONG_SERVICE_HOST}:${KONG_SERVICE_ADMIN_PORT}/routes/92e33755-3d1a-4469-81c2-ca7dc98c589d
-curl -s -X DELETE http://${KONG_SERVICE_HOST}:${KONG_SERVICE_ADMIN_PORT}/routes/3c02b7c0-0e0b-466f-b9b3-332a1b458e02
+routes=$(curl -s -X GET http://${KONG_SERVICE_HOST}:${KONG_SERVICE_ADMIN_PORT}/routes | jq -r '.data[]|.id')
+
+for route in $routes; do
+  curl -s -X DELETE http://${KONG_SERVICE_HOST}:${KONG_SERVICE_ADMIN_PORT}/routes/$route
+done
 
 ## services
-curl -s -X DELETE http://${KONG_SERVICE_HOST}:${KONG_SERVICE_ADMIN_PORT}/services/c0505e29-360b-40b3-8f90-b36611cd38f3
-curl -s -X DELETE http://${KONG_SERVICE_HOST}:${KONG_SERVICE_ADMIN_PORT}/services/94157cc3-0e51-4950-8fdb-384f95987c09
+services=$(curl -s -X GET http://${KONG_SERVICE_HOST}:${KONG_SERVICE_ADMIN_PORT}/services | jq -r '.data[]|.id')
+
+for service in $services; do
+  curl -s -X DELETE http://${KONG_SERVICE_HOST}:${KONG_SERVICE_ADMIN_PORT}/services/$service
+done
 
 # Create
 
@@ -49,4 +66,12 @@ curl -s -X POST http://${KONG_SERVICE_HOST}:${KONG_SERVICE_ADMIN_PORT}/routes \
     -d paths[]=/ \
     -d strip_path=false
 
-# Create plugins
+## plugins
+
+curl -s -X POST http://${KONG_SERVICE_HOST}:${KONG_SERVICE_ADMIN_PORT}/plugins \
+  -d id=3d1b5e45-8b4b-4052-9f2e-297806d5902a \
+  -d service.id=94157cc3-0e51-4950-8fdb-384f95987c09 \
+  -d name=oidc \
+  -d config.client_id=${OIDC_CLIENT_ID} \
+  -d config.client_secret=${OIDC_CLIENT_SECRET} \
+  -d config.discovery=http://localhost:8000/auth/realms/master/.well-known/openid-configuration
