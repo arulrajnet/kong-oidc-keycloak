@@ -1,0 +1,17 @@
+{
+  "realm": "master",
+  "clients": [
+    {
+      "clientId": "web-client",
+      "name": "Web Client",
+      "description": "OIDC client for web based applications",
+      "clientAuthenticatorType": "client-secret",
+      "secret": "cf657905-6daa-4e65-806f-86dd7c968b78",
+      "redirectUris": [
+        "https://localhost:8000/*"
+      ],
+      "protocol": "openid-connect",
+      "publicClient": false
+    }
+  ]
+}

@@ -1,0 +1,188 @@
+version: '2.4'
+
+x-networkName: &networkName "default"
+
+x-default: &default
+  dns:
+    - 1.1.1.1
+    - 1.0.0.1
+
+x-credenv:
+  - &dbType postgres
+  - &keycloakDB keycloak
+  - &keycloakPass admin
+  - &keycloakUser admin
+  - &kongDB kong
+  - &pgHost pgsql
+  - &pgPass secret
+  - &pgPort 5432
+  - &pgUser postgres
+
+x-pgenv: &pgenv
+  POSTGRES_USER: *pgUser
+  POSTGRES_PASSWORD: *pgPass
+  POSTGRES_DB: *keycloakDB
+  PGDATA: /data/postgres
+
+x-kongmigrationenv: &kongmigrationenv
+  KONG_DATABASE: *dbType
+  KONG_PG_DATABASE: *kongDB
+  KONG_PG_HOST: *pgHost
+  KONG_PG_USER: *pgUser
+  KONG_PG_PASSWORD: *pgPass
+
+networks:
+  *networkName:
+    ipam:
+      driver: default
+
+services:
+
+  pgsql:
+    <<: *default
+    image: postgres:13.4-alpine
+    ports:
+      - 5432
+    environment:
+      *pgenv
+    volumes:
+      - pgdata:/data/postgres
+      - ./postgres-init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready", "-U", "postgres"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  # Kong DB bootstrap
+  kong-migrations:
+    <<: *default
+    build: .
+    image: arulrajnet/kong:dev
+    command: kong migrations bootstrap
+    depends_on:
+      pgsql:
+        condition: service_healthy
+    restart: on-failure
+    environment:
+      *kongmigrationenv
+
+  # Kong DB migration
+  kong-migrations-up:
+    <<: *default
+    build: .
+    image: arulrajnet/kong:dev
+    command: kong migrations up && kong migrations finish
+    depends_on:
+      pgsql:
+        condition: service_healthy
+      kong-migrations:
+        condition: service_completed_successfully
+    restart: on-failure
+    environment:
+      *kongmigrationenv
+
+  kong:
+    <<: *default
+    build: .
+    image: arulrajnet/kong:dev
+    depends_on:
+      pgsql:
+        condition: service_healthy
+      kong-migrations-up:
+        condition: service_completed_successfully
+    environment:
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_LISTEN: '0.0.0.0:8001'
+      KONG_PROXY_LISTEN: '0.0.0.0:8000'
+      KONG_CASSANDRA_CONTACT_POINTS: pgsql
+      KONG_DATABASE: *dbType
+      KONG_PG_DATABASE: *kongDB
+      KONG_PG_HOST: *pgHost
+      KONG_PG_USER: *pgUser
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_PG_PASSWORD: *pgPass
+    ports:
+      - 8000:8000
+      - 8001
+      - 8443
+      - 8444
+    hostname: myapp.local
+    healthcheck:
+      test: ["CMD", "kong", "health"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 1m
+    restart: on-failure
+
+  keycloak:
+    <<: *default
+    image: jboss/keycloak:15.0.2
+    ports:
+      - 8080
+      - 9990
+    environment:
+      DB_VENDOR: *dbType
+      DB_SCHEMA: public
+      DB_ADDR: *pgHost
+      DB_PORT: *pgPort
+      DB_DATABASE: *keycloakDB
+      DB_USER: *pgUser
+      DB_PASSWORD: *pgPass
+      KEYCLOAK_USER: *keycloakUser
+      KEYCLOAK_PASSWORD: *keycloakPass
+      PROXY_ADDRESS_FORWARDING: "true"
+    depends_on:
+      pgsql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail http://localhost:8080/auth/realms/master"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 1m
+    restart: on-failure
+
+  keycloak-config-init:
+    <<: *default
+    image: adorsys/keycloak-config-cli:v4.2.1-rc0-15.0.1
+    environment:
+      KEYCLOAK_URL: http://keycloak:8080/auth
+      KEYCLOAK_USER: *keycloakUser
+      KEYCLOAK_PASSWORD: *keycloakUser
+      KEYCLOAK_AVAILABILITYCHECK_ENABLED: "true"
+      KEYCLOAK_AVAILABILITYCHECK_TIMEOUT: 120s
+      IMPORT_PATH: /config
+      IMPORT_FORCE: "false"
+    depends_on:
+      keycloak:
+        condition: service_healthy
+    volumes:
+      - ./keycloak-config:/config
+
+  kong-config-init:
+    <<: *default
+    image: curlimages/curl:7.78.0
+    user: root
+    volumes:
+      - ./kong-config/kong-config-init.sh:/kong-config-init.sh
+    depends_on:
+      kong:
+        condition: service_healthy
+    entrypoint: /bin/sh -c "apk add jq && /kong-config-init.sh"
+    restart: on-failure
+
+  httpbin:
+    <<: *default
+    image: kennethreitz/httpbin:latest
+    networks:
+      *networkName:
+    ports:
+      - 80
+
+volumes:
+  pgdata:
