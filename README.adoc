@@ -84,6 +84,6 @@ To handle the load
 
 [%autowidth, grid=all]
 |===
-a|image::https://avatars0.githubusercontent.com/u/834529?s=70[alt="Follow @arulrajnet on Twitter", align="center", link="https://twitter.com/arulrajnet", window=_blank]
+^a|image::https://avatars0.githubusercontent.com/u/834529?s=70[alt="Follow @arulrajnet on Twitter", align="center", link="https://twitter.com/arulrajnet", window=_blank]
 |link:https://twitter.com/arulrajnet[@arulrajnet, title="Follow @arulrajnet on Twitter", window=_blank]
 |===
