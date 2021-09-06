@@ -10,7 +10,7 @@ This example repo describe how to access httpbin/any service securely via kong O
 == Prerequisites
 
 * Docker 19.03.13 or latest
-* Docker compose 1.28.2 or latest
+* Docker compose 1.29.2 or latest
 
 == How to use
 
